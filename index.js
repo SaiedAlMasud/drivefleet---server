@@ -77,6 +77,53 @@ app.post('/cars', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// Get cars by owner ID (my added cars)
+app.get('/cars/my-cars/:userId', async (req, res) => {
+  if (!carsCollection) {
+    return res.status(500).json({ error: "Database not connected yet" });
+  }
+  const { userId } = req.params;
+  const cars = await carsCollection.find({ 'owner.id': userId }).toArray();
+  res.json(cars);
+});
+
+// Delete a car
+app.delete('/cars/:id', async (req, res) => {
+  try {
+    if (!carsCollection) {
+      return res.status(500).json({ error: "Database not connected yet" });
+    }
+    const { id } = req.params;
+    const result = await carsCollection.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "Car not found" });
+    }
+    res.json({ message: 'Car deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update a car
+app.put('/cars/:id', async (req, res) => {
+  try {
+    if (!carsCollection) {
+      return res.status(500).json({ error: "Database not connected yet" });
+    }
+    const { id } = req.params;
+    const updateData = req.body;
+    const result = await carsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Car not found" });
+    }
+    res.json({ message: 'Car updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 // ============ BOOKING ROUTES ============
 
