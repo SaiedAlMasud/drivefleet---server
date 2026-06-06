@@ -58,7 +58,25 @@ app.get('/cars/:id', async (req, res) => {
   res.json(car);
 });
 
-
+// Add a new car
+app.post('/cars', async (req, res) => {
+  try {
+    if (!carsCollection) {
+      return res.status(500).json({ error: "Database not connected yet" });
+    }
+    
+    const carData = req.body;
+    const result = await carsCollection.insertOne(carData);
+    
+    res.status(201).json({ 
+      message: 'Car added successfully', 
+      carId: result.insertedId 
+    });
+  } catch (error) {
+    console.error('Error adding car:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 
 // ============ BOOKING ROUTES ============
 
