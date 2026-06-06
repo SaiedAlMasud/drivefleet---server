@@ -27,10 +27,10 @@ async function connectDB() {
   carsCollection = db.collection("cars");
   bookingsCollection = db.collection("bookings");
   console.log("✅ MongoDB connected successfully!");
-  
+
   const carCount = await carsCollection.countDocuments();
   console.log(`✅ Found ${carCount} cars in database`);
-  
+
   const bookingCount = await bookingsCollection.countDocuments();
   console.log(`✅ Found ${bookingCount} bookings in database`);
 }
@@ -42,19 +42,45 @@ app.use(express.json());
 
 // ============ CAR ROUTES ============
 
-// Get all cars
+
+
+// ============ CAR ROUTES ============
+
+// Get all cars with search and filter (combined into one endpoint)
 app.get('/cars', async (req, res) => {
-  if (!carsCollection) {
-    return res.status(500).json({ error: "Database not connected yet" });
+  try {
+    if (!carsCollection) {
+      return res.status(500).json({ error: "Database not connected yet" });
+    }
+
+    const { search, type } = req.query;
+    let query = {};
+
+    // Search by car name using $regex (case-insensitive)
+    if (search && search.trim() !== '') {
+      query.carName = { $regex: search, $options: 'i' };
+    }
+
+    // Filter by car type
+    if (type && type !== 'All Types') {
+      query.carType = type;
+    }
+
+    console.log('Search query:', { search, type }); // Debug log
+    console.log('MongoDB query:', query); // Debug log
+
+    const cars = await carsCollection.find(query).toArray();
+    res.json(cars);
+  } catch (error) {
+    console.error('Error fetching cars:', error);
+    res.status(500).json({ message: error.message });
   }
-  const cars = await carsCollection.find().toArray();
-  res.json(cars);
 });
 
 // Get car by ID
 app.get('/cars/:id', async (req, res) => {
-  const { id } = req.params; 
-  const car = await carsCollection.findOne({ _id: new ObjectId(id) }); 
+  const { id } = req.params;
+  const car = await carsCollection.findOne({ _id: new ObjectId(id) });
   res.json(car);
 });
 
@@ -64,19 +90,20 @@ app.post('/cars', async (req, res) => {
     if (!carsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
     }
-    
+
     const carData = req.body;
     const result = await carsCollection.insertOne(carData);
-    
-    res.status(201).json({ 
-      message: 'Car added successfully', 
-      carId: result.insertedId 
+
+    res.status(201).json({
+      message: 'Car added successfully',
+      carId: result.insertedId
     });
   } catch (error) {
     console.error('Error adding car:', error);
     res.status(500).json({ message: error.message });
   }
 });
+
 // Get cars by owner ID (my added cars)
 app.get('/cars/my-cars/:userId', async (req, res) => {
   if (!carsCollection) {
@@ -130,21 +157,28 @@ app.put('/cars/:id', async (req, res) => {
 // Create a new booking
 app.post('/api/bookings', async (req, res) => {
   try {
-    if (!bookingsCollection) {
+    if (!bookingsCollection || !carsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
     }
-    
+
     const bookingData = {
       ...req.body,
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
+
     const result = await bookingsCollection.insertOne(bookingData);
-    
-    res.status(201).json({ 
-      message: 'Booking created successfully', 
-      bookingId: result.insertedId 
+
+    if (bookingData.carId) {
+      await carsCollection.updateOne(
+        { _id: new ObjectId(bookingData.carId) },
+        { $inc: { bookingCount: 1 } }
+      );
+    }
+
+    res.status(201).json({
+      message: 'Booking created successfully',
+      bookingId: result.insertedId
     });
   } catch (error) {
     console.error('Error creating booking:', error);
@@ -158,7 +192,7 @@ app.get('/api/bookings/user/:userId', async (req, res) => {
     if (!bookingsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
     }
-    
+
     const { userId } = req.params;
     const bookings = await bookingsCollection
       .find({ userId: userId })
@@ -177,7 +211,7 @@ app.get('/api/bookings', async (req, res) => {
     if (!bookingsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
     }
-    
+
     const bookings = await bookingsCollection
       .find()
       .sort({ bookingDate: -1 })
@@ -195,16 +229,16 @@ app.get('/api/bookings/:id', async (req, res) => {
     if (!bookingsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
     }
-    
+
     const { id } = req.params;
-    const booking = await bookingsCollection.findOne({ 
-      _id: new ObjectId(id) 
+    const booking = await bookingsCollection.findOne({
+      _id: new ObjectId(id)
     });
-    
+
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
-    
+
     res.json(booking);
   } catch (error) {
     console.error('Error fetching booking:', error);
@@ -218,19 +252,19 @@ app.patch('/api/bookings/:id/status', async (req, res) => {
     if (!bookingsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
     }
-    
+
     const { id } = req.params;
     const { status } = req.body;
-    
+
     const result = await bookingsCollection.updateOne(
       { _id: new ObjectId(id) },
       { $set: { status, updatedAt: new Date() } }
     );
-    
+
     if (result.matchedCount === 0) {
       return res.status(404).json({ message: "Booking not found" });
     }
-    
+
     res.json({ message: 'Booking status updated' });
   } catch (error) {
     console.error('Error updating booking:', error);
@@ -244,14 +278,14 @@ app.delete('/api/bookings/:id', async (req, res) => {
     if (!bookingsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
     }
-    
+
     const { id } = req.params;
     const result = await bookingsCollection.deleteOne({ _id: new ObjectId(id) });
-    
+
     if (result.deletedCount === 0) {
       return res.status(404).json({ message: "Booking not found" });
     }
-    
+
     res.json({ message: 'Booking cancelled successfully' });
   } catch (error) {
     console.error('Error cancelling booking:', error);
