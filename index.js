@@ -182,7 +182,7 @@ app.put('/cars/:id', varifyToken, async (req, res) => {
 // ============ BOOKING ROUTES ============
 
 // Create a new booking
-app.post('/api/bookings', async (req, res) => {
+app.post('/api/bookings', varifyToken, async (req, res) => {
   try {
     if (!bookingsCollection || !carsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
