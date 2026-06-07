@@ -159,7 +159,7 @@ app.delete('/cars/:id',varifyToken, async (req, res) => {
 });
 
 // Update a car
-app.put('/cars/:id', async (req, res) => {
+app.put('/cars/:id', varifyToken, async (req, res) => {
   try {
     if (!carsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
