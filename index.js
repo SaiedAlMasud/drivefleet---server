@@ -214,7 +214,7 @@ app.post('/api/bookings', varifyToken, async (req, res) => {
 });
 
 // Get user's bookings
-app.get('/api/bookings/user/:userId', async (req, res) => {
+app.get('/api/bookings/user/:userId', varifyToken, async (req, res) => {
   try {
     if (!bookingsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
