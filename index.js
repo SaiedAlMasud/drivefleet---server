@@ -1,9 +1,11 @@
 const express = require('express');
+
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 const dotenv = require('dotenv');
+const { createRemoteJWKSet, jwtVerify } = require('jose-cjs');
 dotenv.config();
 
 const uri = `mongodb+srv://drivefleet:Drivefleet12345@cluster0.pktpfdw.mongodb.net/?appName=Cluster0`;
@@ -17,6 +19,31 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   }
 });
+const JWKS = createRemoteJWKSet(
+  new URL("http://localhost:3000/api/auth/jwks")
+)
+
+const varifyToken = async (req, res, next) => {
+  const header = req?.headers.authorization;
+  if (!header) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const token = header?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+    console.log("Token payload:", payload); // Debug log
+    next();
+  }
+  catch (error) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+}
 
 let carsCollection;
 let bookingsCollection;
@@ -37,11 +64,11 @@ async function connectDB() {
 
 connectDB().catch(console.error);
 
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:3000",
+  credentials: true,
+}));
 app.use(express.json());
-
-// ============ CAR ROUTES ============
-
 
 
 // ============ CAR ROUTES ============
@@ -85,7 +112,7 @@ app.get('/cars/:id', async (req, res) => {
 });
 
 // Add a new car
-app.post('/cars', async (req, res) => {
+app.post('/cars',varifyToken, async (req, res) => {
   try {
     if (!carsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
@@ -105,7 +132,7 @@ app.post('/cars', async (req, res) => {
 });
 
 // Get cars by owner ID (my added cars)
-app.get('/cars/my-cars/:userId', async (req, res) => {
+app.get('/cars/my-cars/:userId',varifyToken, async (req, res) => {
   if (!carsCollection) {
     return res.status(500).json({ error: "Database not connected yet" });
   }
@@ -115,7 +142,7 @@ app.get('/cars/my-cars/:userId', async (req, res) => {
 });
 
 // Delete a car
-app.delete('/cars/:id', async (req, res) => {
+app.delete('/cars/:id',varifyToken, async (req, res) => {
   try {
     if (!carsCollection) {
       return res.status(500).json({ error: "Database not connected yet" });
