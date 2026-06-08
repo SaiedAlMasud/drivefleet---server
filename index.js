@@ -8,7 +8,8 @@ const dotenv = require('dotenv');
 const { createRemoteJWKSet, jwtVerify } = require('jose-cjs');
 dotenv.config();
 
-const uri = `mongodb+srv://drivefleet:Drivefleet12345@cluster0.pktpfdw.mongodb.net/?appName=Cluster0`;
+
+const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.pktpfdw.mongodb.net/?appName=Cluster0`;
 
 console.log("Connecting to MongoDB...");
 
@@ -20,7 +21,7 @@ const client = new MongoClient(uri, {
   }
 });
 const JWKS = createRemoteJWKSet(
-  new URL("http://localhost:3000/api/auth/jwks")
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
 )
 
 const varifyToken = async (req, res, next) => {
@@ -49,7 +50,7 @@ let carsCollection;
 let bookingsCollection;
 
 async function connectDB() {
-  await client.connect();
+  //await client.connect();
   const db = client.db("drivefleet");
   carsCollection = db.collection("cars");
   bookingsCollection = db.collection("bookings");
@@ -65,7 +66,7 @@ async function connectDB() {
 connectDB().catch(console.error);
 
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: process.env.CLIENT_URL,
   credentials: true,
 }));
 app.use(express.json());
